@@ -27,7 +27,6 @@ Toolkit.run(async tools => {
     date: Date.now()
   }
 
-
   // const glob = require('glob')
   // const fs = require('fs')
   let table_data = [["Package", "version", "fix", "vulnerability", "Risk", "Scan_File_Path"]]
