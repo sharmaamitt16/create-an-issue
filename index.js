@@ -1,5 +1,6 @@
 const core = require('@actions/core')
 const btoa = require('btoa')
+// const glob = require('@actions/glob')
 const glob = require('glob')
 const { Toolkit } = require('actions-toolkit')
 const fm = require('front-matter')
@@ -26,11 +27,13 @@ Toolkit.run(async tools => {
     date: Date.now()
   }
 
+
+  // const glob = require('glob')
+  // const fs = require('fs')
   let table_data = [["Package", "version", "fix", "vulnerability", "Risk", "Scan_File_Path"]]
   // Read all the scan reports using glob.
   glob.sync("./anchore-reports/scan_*.json")
   .forEach(vulnerabilities => {
-      // console.log(vulnerabilities)
       // Get the vulnerability file
       tools.log.debug('Reading vulnerabilities file', vulnerabilities)
       const vulnerability_file_data = tools.getFile(vulnerabilities)
@@ -52,7 +55,7 @@ Toolkit.run(async tools => {
             issue.fix,
             vulnerability,
             issue.severity,
-            './anchore/dev.json' //vulnerabilities.split("/")[-1]
+            vulnerabilities.split("/").pop()
           ]);
         }
       });
@@ -92,8 +95,8 @@ Toolkit.run(async tools => {
 
     // Check if issue exists with same vulnerabilities.
     openIssues.forEach(openIssue => {
-      if (btoa(openIssue.body) == btoa(templated.body)) {
-        createNewIssue = true;
+      if (btoa(openIssue.body) === btoa(templated.body)) {
+        createNewIssue = false;
       }
     });
 
