@@ -1,6 +1,5 @@
 const core = require('@actions/core')
 const btoa = require('btoa')
-// const glob = require('@actions/glob')
 const glob = require('glob')
 const { Toolkit } = require('actions-toolkit')
 const fm = require('front-matter')
