@@ -1,5 +1,7 @@
 const core = require('@actions/core')
-const glob = require('@actions/glob')
+const btoa = require('btoa')
+// const glob = require('@actions/glob')
+const glob = require('glob')
 const { Toolkit } = require('actions-toolkit')
 const fm = require('front-matter')
 const nunjucks = require('nunjucks')
@@ -25,19 +27,27 @@ Toolkit.run(async tools => {
     date: Date.now()
   }
 
+
+  // const glob = require('glob')
+  // const fs = require('fs')
+  let table_data = [["Package", "version", "fix", "vulnerability", "Risk", "Scan_File_Path"]]
   // Read all the scan reports using glob.
-  glob("./anchore-reports/scan_*.json", function(err, files) { // read the folder.
-    files.forEach(function(vulnerabilities) {
+  glob.sync("./anchore-reports/scan_*.json")
+  .forEach(vulnerabilities => {
+      // console.log(vulnerabilities)
       // Get the vulnerability file
       tools.log.debug('Reading vulnerabilities file', vulnerabilities)
       const vulnerability_file_data = tools.getFile(vulnerabilities)
+      // const vulnerability_file_data =  fs.readFileSync(vulnerabilities)
       const vulnerabilities_data = JSON.parse(vulnerability_file_data)
+      // console.log(Object.keys(vulnerabilities_data))
       // let severities = []
       const issues = vulnerabilities_data.vulnerabilities
-      let table_data = [["Package", "version", "fix", "vulnerability", "Risk", "Scan_File_Path"]]
-      issues.forEach(issue => {
+      console.log(issues.length)
+      issues.forEach((issue, index) => {
+        console.log(`vulnerability object row ${index}` )
         // let columns = []
-        if (issue.severity === "High" && issue.fix != "None"){
+        if (issue.severity === "High"){ //&& issue.fix != "None"){
           // severities.push(issue)
           let vulnerability = `[${issue.vuln}](${issue.url})`
           table_data.push([
@@ -46,12 +56,12 @@ Toolkit.run(async tools => {
             issue.fix,
             vulnerability,
             issue.severity,
-            vulnerabilities
+            './anchore/dev.json' //vulnerabilities.split("/")[-1]
           ]);
         }
       });
     });
-  });
+  console.log(table_data)
 
   // Get the template file
   tools.log.debug('Reading from file', template)
@@ -63,6 +73,7 @@ Toolkit.run(async tools => {
 
   // compose issue body
   const issue_body = body + '\n' + table(table_data)
+  tools.log.info(issue_body)
 
   const templated = {
     body: env.renderString(issue_body, templateVariables),
@@ -74,21 +85,19 @@ Toolkit.run(async tools => {
 
   // read open issue created my action
   // @TODO: here
-  var createNewIssue = TRUE;
+  var createNewIssue = true;
   try {
-    var openIssues = await tools.github.issues.listForRepo({
-      owner: 'srijanone',
-      repo: 'docker-base-images',
+    const { data: openIssues } = await tools.github.issues.listForRepo({
+      ...tools.context.repo,
       creator: 'github-actions[bot]',
       state: 'open'
     });
-    tools.log.info(open_issues);
+    tools.log.info(openIssues);
 
     // Check if issue exists with same vulnerabilities.
     openIssues.forEach(openIssue => {
-      if (base64_encode(openIssue.body) == base64_encode(templated.body)) {
-        createNewIssue = FALSE;
-        break;
+      if (btoa(openIssue.body) == btoa(templated.body)) {
+        createNewIssue = true;
       }
     });
 
@@ -107,7 +116,7 @@ Toolkit.run(async tools => {
   }
 
   // Create the new issue
-  if (createNewIssue == TRUE) {
+  if (createNewIssue == true) {
     try {
       const issue = await tools.github.issues.create({
         ...tools.context.repo,
