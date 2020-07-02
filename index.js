@@ -1,13 +1,11 @@
 const core = require('@actions/core')
 const btoa = require('btoa')
-// const glob = require('@actions/glob')
 const glob = require('glob')
 const { Toolkit } = require('actions-toolkit')
 const fm = require('front-matter')
 const nunjucks = require('nunjucks')
 const dateFilter = require('nunjucks-date-filter')
 const table = require('markdown-table')
-
 
 function listToArray (list) {
   if (!list) return []
@@ -16,8 +14,8 @@ function listToArray (list) {
 
 Toolkit.run(async tools => {
   const template = tools.inputs.filename || '.github/ISSUE_TEMPLATE.md'
+  const reportPathPattern = tools.inputs.reportFilesPattern || './anchore-reports/scan_*.json'
   const assignees = tools.inputs.assignees
-  // var vulnerabilities = tools.inputs.vulnerabilities || './anchore-reports/vulnerabilities.json'
   const env = nunjucks.configure({ autoescape: false })
   env.addFilter('date', dateFilter)
 
@@ -27,40 +25,33 @@ Toolkit.run(async tools => {
     date: Date.now()
   }
 
-
-  // const glob = require('glob')
-  // const fs = require('fs')
-  let table_data = [["Package", "version", "fix", "vulnerability", "Risk", "Scan_File_Path"]]
+  let table_data = [["Image source", "Package", "Version", "Fix", "Vulnerability", "Risk"]]
   // Read all the scan reports using glob.
-  glob.sync("./anchore-reports/scan_*.json")
-  .forEach(vulnerabilities => {
-      // Get the vulnerability file
-      tools.log.debug('Reading vulnerabilities file', vulnerabilities)
-      const vulnerability_file_data = tools.getFile(vulnerabilities)
-      // const vulnerability_file_data =  fs.readFileSync(vulnerabilities)
-      const vulnerabilities_data = JSON.parse(vulnerability_file_data)
-      // console.log(Object.keys(vulnerabilities_data))
-      // let severities = []
+  glob.sync(reportPathPattern)
+  .forEach(report_file => {
+      tools.log.debug('Reading vulnerabilities file', report_file)
+      const report_file_raw_data = tools.getFile(report_file)
+      const vulnerabilities_data = JSON.parse(report_file_raw_data)
       const issues = vulnerabilities_data.vulnerabilities
-      console.log(issues.length)
       issues.forEach((issue, index) => {
-        console.log(`vulnerability object row ${index}` )
-        // let columns = []
-        if (issue.severity === "High"){ //&& issue.fix != "None"){
-          // severities.push(issue)
+        if (issue.severity === "High" && issue.fix !== "None"){
           let vulnerability = `[${issue.vuln}](${issue.url})`
           table_data.push([
+            report_file.split("/").pop().split(".")[0].split("_").splice(1).join("/") + "/Dockerfile",
             issue.package_name,
             issue.package_version,
             issue.fix,
             vulnerability,
-            issue.severity,
-            vulnerabilities.split("/").pop()
+            issue.severity
           ]);
         }
       });
     });
-  console.log(table_data)
+
+  if(table_data.length === 1) {
+    tools.log.info(`No high risk vulnerabilities with fix are found`)
+    tools.exit.success()
+  }
 
   // Get the template file
   tools.log.debug('Reading from file', template)
@@ -83,8 +74,7 @@ Toolkit.run(async tools => {
   tools.log.info(`Creating new issue ${templated.title}`)
 
   // read open issue created my action
-  // @TODO: here
-  var createNewIssue = true;
+  let createNewIssue = true;
   try {
     const { data: openIssues } = await tools.github.issues.listForRepo({
       ...tools.context.repo,
@@ -139,6 +129,7 @@ Toolkit.run(async tools => {
 
       // Exit with a failing status
       core.setFailed(errorMessage + '\n\n' + err.message)
+    } finally {
       tools.exit.failure()
     }
   }
