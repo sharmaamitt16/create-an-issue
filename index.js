@@ -34,7 +34,7 @@ Toolkit.run(async tools => {
       const vulnerabilities_data = JSON.parse(report_file_raw_data)
       const issues = vulnerabilities_data.vulnerabilities
       issues.forEach((issue, index) => {
-        if (issue.severity === "High") { //&& issue.fix !== "None"){
+        if (issue.severity === "High" && issue.fix !== "None"){
           let vulnerability = `[${issue.vuln}](${issue.url})`
           table_data.push([
             report_file.split("/").pop().split(".")[0].split("_").splice(1).join("/") + "/Dockerfile",
